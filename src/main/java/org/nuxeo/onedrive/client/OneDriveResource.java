@@ -30,15 +30,22 @@ public class OneDriveResource {
     private final OneDriveAPI api;
 
     private final String id;
+    private final String path;
 
     OneDriveResource(OneDriveAPI api) {
         this.api = Objects.requireNonNull(api);
         this.id = null;
+        this.path = null;
     }
 
-    public OneDriveResource(OneDriveAPI api, String id) {
+    public OneDriveResource(OneDriveAPI api, String id, String path) {
         this.api = Objects.requireNonNull(api);
-        this.id = Objects.requireNonNull(id);
+        if(path == null) {
+            this.id = Objects.requireNonNull(id);
+        } else {
+            this.id = null;
+        }
+        this.path = path;
     }
 
     public OneDriveAPI getApi() {
@@ -47,6 +54,9 @@ public class OneDriveResource {
 
     public String getId() {
         return id;
+    }
+    public String getPath() {
+        return path;
     }
 
     public boolean isRoot() {

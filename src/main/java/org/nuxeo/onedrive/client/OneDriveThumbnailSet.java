@@ -36,13 +36,13 @@ public class OneDriveThumbnailSet extends OneDriveResource {
     private final int thumbId;
 
     OneDriveThumbnailSet(OneDriveAPI api, int thumbId) {
-        super(api, "root$$" + thumbId);
+        super(api, "root$$" + thumbId, null);
         this.itemId = null;
         this.thumbId = thumbId;
     }
 
     OneDriveThumbnailSet(OneDriveAPI api, String itemId, int thumbId) {
-        super(api, itemId + "$$" + thumbId);
+        super(api, itemId + "$$" + thumbId, null);
         this.itemId = Objects.requireNonNull(itemId);
         this.thumbId = thumbId;
     }

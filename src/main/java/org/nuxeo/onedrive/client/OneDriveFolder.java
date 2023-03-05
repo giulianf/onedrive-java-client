@@ -1,31 +1,32 @@
 /*
  * (C) Copyright 2016 Nuxeo SA (http://nuxeo.com/) and others.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *  
+ *
  * Contributors:
  *     Kevin Leturc
  */
 package org.nuxeo.onedrive.client;
 
+import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
+import com.eclipsesource.json.ParseException;
+
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Iterator;
 import java.util.List;
-
-import com.eclipsesource.json.JsonObject;
-import com.eclipsesource.json.JsonValue;
-import com.eclipsesource.json.ParseException;
 
 /**
  * @since 1.0
@@ -35,6 +36,7 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
     private static final URLTemplate GET_FOLDER_ROOT_URL = new URLTemplate("/drive/root");
 
     private static final URLTemplate GET_CHILDREN_ROOT_URL = new URLTemplate("/drive/root/children");
+    private static final URLTemplate GET_BY_PATH_URL = new URLTemplate("/drive/root:/%s");
 
     private static final URLTemplate SEARCH_IN_ROOT_URL = new URLTemplate("/drive/root/view.search");
 
@@ -57,7 +59,7 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
     }
 
     @Override
-    public OneDriveFolder.Metadata getMetadata(OneDriveExpand... expands) throws OneDriveAPIException {
+    public Metadata getMetadata(OneDriveExpand... expands) throws OneDriveAPIException {
         QueryStringBuilder query = new QueryStringBuilder().set("expand", expands);
         URL url;
         if (isRoot()) {
@@ -67,7 +69,7 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
         }
         OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "GET");
         OneDriveJsonResponse response = request.send();
-        return new OneDriveFolder.Metadata(response.getContent());
+        return new Metadata(response.getContent());
     }
 
     public static OneDriveFolder getRoot(OneDriveAPI api) {
@@ -84,7 +86,7 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
 
     @Override
     public Iterator<OneDriveItem.Metadata> iterator() {
-        return iterator(new OneDriveExpand[] {});
+        return iterator(new OneDriveExpand[]{});
     }
 
     public Iterator<OneDriveItem.Metadata> iterator(OneDriveExpand... expands) {
@@ -96,6 +98,16 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
             url = GET_CHILDREN_URL.build(getApi().getBaseURL(), query, getId());
         }
         return new OneDriveItemIterator(getApi(), url);
+    }
+
+    public Metadata getByPath() throws OneDriveAPIException {
+        URL url;
+
+        url = GET_BY_PATH_URL.build(getApi().getBaseURL(), getId());
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "GET");
+        OneDriveJsonResponse response = request.send();
+
+        return new Metadata(response.getContent());
     }
 
     public Iterable<OneDriveItem.Metadata> search(String search, OneDriveExpand... expands) {
@@ -137,6 +149,23 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
         }
     }
 
+    /**
+     * @since 2.2
+     */
+    public Metadata createFolder(boolean isRoot, String newFolder) throws IOException {
+        URLTemplate stringUrl = isRoot ? GET_CHILDREN_ROOT_URL : GET_CHILDREN_URL;
+        URL url = stringUrl.build(getApi().getBaseURL(), getId());
+
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "POST");
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.add("name", newFolder);
+        jsonObject.add("folder", new JsonObject());
+//        jsonObject.add("@microsoft.graph.conflictBehavior", "replace");
+        request.setBody(jsonObject);
+        OneDriveJsonResponse response = request.send();
+        return new Metadata(response.getContent());
+    }
+
     @Override
     public Iterable<OneDriveThumbnailSet.Metadata> getThumbnailSets() {
         if (isRoot()) {
@@ -145,10 +174,13 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
         return super.getThumbnailSets();
     }
 
-    /** See documentation at https://dev.onedrive.com/resources/item.htm. */
+    /**
+     * See documentation at https://dev.onedrive.com/resources/item.htm.
+     */
     public class Metadata extends OneDriveItem.Metadata {
 
         private long childCount;
+        private String folderId;
 
         @Override
         public List<OneDriveThumbnailSet.Metadata> getThumbnailSets() {
@@ -171,6 +203,8 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
                 String memberName = member.getName();
                 if ("folder".equals(memberName)) {
                     parseMember(value.asObject(), this::parseChildMember);
+                } else if ("id".equals(memberName)) {
+                    folderId = value.asString();
                 }
             } catch (ParseException e) {
                 throw new OneDriveRuntimeException("Parse failed, maybe a bug in client.", e);
@@ -196,18 +230,28 @@ public class OneDriveFolder extends OneDriveItem implements Iterable<OneDriveIte
         }
 
         @Override
-        public OneDriveFolder.Metadata asFolder() {
+        public Metadata asFolder() {
             return this;
+        }
+
+        public String getFolderId() {
+            return folderId;
         }
     }
 
-    /** See documentation at https://dev.onedrive.com/resources/itemReference.htm. */
+    /**
+     * See documentation at https://dev.onedrive.com/resources/itemReference.htm.
+     */
     public class Reference extends OneDriveResource.Metadata {
 
-        /** Unique identifier for the Drive that contains the item. */
+        /**
+         * Unique identifier for the Drive that contains the item.
+         */
         private String driveId;
 
-        /** Path that used to navigate to the item. */
+        /**
+         * Path that used to navigate to the item.
+         */
         private String path;
 
         public Reference(JsonObject json) {

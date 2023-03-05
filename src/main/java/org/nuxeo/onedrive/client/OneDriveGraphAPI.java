@@ -25,6 +25,7 @@ public class OneDriveGraphAPI implements OneDriveAPI {
 
     protected String accessToken;
     protected String userId;
+    protected String siteId;
 
     public OneDriveGraphAPI(String accessToken) {
         this.accessToken = accessToken;
@@ -32,6 +33,12 @@ public class OneDriveGraphAPI implements OneDriveAPI {
 
     public OneDriveGraphAPI(String accessToken, String userId) {
         this.accessToken = accessToken;
+        this.userId = userId;
+    }
+
+    public OneDriveGraphAPI(String accessToken, String sites, String userId) {
+        this.accessToken = accessToken;
+        this.siteId = sites;
         this.userId = userId;
     }
 
@@ -47,8 +54,12 @@ public class OneDriveGraphAPI implements OneDriveAPI {
 
     @Override
     public String getBaseURL() {
-        return "https://graph.microsoft.com/v1.0/"+
-                (userId ==null ? "me" : "/users/"+ userId);
+        if(siteId != null && !siteId.isEmpty()) {
+            return "https://graph.microsoft.com/v1.0/sites/" +  siteId ;
+        } else {
+            return "https://graph.microsoft.com/v1.0/" +
+                    (userId == null ? "me" : "/users/" + userId);
+        }
     }
 
     @Override

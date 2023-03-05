@@ -184,7 +184,12 @@ public abstract class AbstractRequest<R extends AbstractResponse> {
         }
 
         try {
-            connection.setRequestMethod(method);
+            if(method.equals("PATCH")) {
+                connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+                connection.setRequestMethod("POST");
+            } else {
+                connection.setRequestMethod(method);
+            }
         } catch (ProtocolException e) {
             throw new OneDriveAPIException("Couldn't connect to OneDrive API because method is not correct.", e);
         }

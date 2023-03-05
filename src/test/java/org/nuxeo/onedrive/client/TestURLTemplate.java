@@ -30,20 +30,20 @@ public class TestURLTemplate extends OneDriveTestCase {
     @Test
     public void testBuild() {
         URLTemplate template = new URLTemplate("/drive/%s");
-        assertEquals("https://api.onedrive.com/v1.0/drive/root", template.build(api.getBaseURL(), "root").toString());
+        assertEquals("https://graph.microsoft.com/v1.0/drive/root", template.build(api.getBaseURL(), "root").toString());
     }
 
     @Test(expected = OneDriveRuntimeException.class)
     public void testBuildWithError() {
         URLTemplate template = new URLTemplate("/drive/%s");
-        assertEquals("https://api.onedrive.com/v1.0/drive/root", template.build("", "root").toString());
+        assertEquals("https://graph.microsoft.com/v1.0/drive/root", template.build("", "root").toString());
     }
 
     @Test
     public void testBuildWithQueryString() {
         URLTemplate template = new URLTemplate("/drive/%s");
         QueryStringBuilder queryString = new QueryStringBuilder().set("top", 100);
-        assertEquals("https://api.onedrive.com/v1.0/drive/root?top=100",
+        assertEquals("https://graph.microsoft.com/v1.0/drive/root?top=100",
                 template.build(api.getBaseURL(), queryString, "root").toString());
     }
 
@@ -51,7 +51,7 @@ public class TestURLTemplate extends OneDriveTestCase {
     public void testBuildWithQueryStringAndError() {
         URLTemplate template = new URLTemplate("/drive/%s");
         QueryStringBuilder queryString = new QueryStringBuilder().set("top", 100);
-        assertEquals("https://api.onedrive.com/v1.0/drive/root?top=100", template.build("", queryString, "root")
+        assertEquals("https://graph.microsoft.com/v1.0/drive/root?top=100", template.build("", queryString, "root")
                                                                                  .toString());
     }
 

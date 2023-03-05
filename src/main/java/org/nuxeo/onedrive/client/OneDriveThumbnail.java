@@ -50,14 +50,14 @@ public class OneDriveThumbnail extends OneDriveResource {
     private final OneDriveThumbnailSize size;
 
     OneDriveThumbnail(OneDriveAPI api, int thumbId, OneDriveThumbnailSize size) {
-        super(api, "root$$" + thumbId + "$$" + size.getKey());
+        super(api, "root$$" + thumbId + "$$" + size.getKey(), null);
         this.itemId = null;
         this.thumbId = thumbId;
         this.size = Objects.requireNonNull(size);
     }
 
     public OneDriveThumbnail(OneDriveAPI api, String itemId, int thumbId, OneDriveThumbnailSize size) {
-        super(api, itemId + "$$" + thumbId + "$$" + size.getKey());
+        super(api, itemId + "$$" + thumbId + "$$" + size.getKey(), null);
         this.itemId = Objects.requireNonNull(itemId);
         this.thumbId = thumbId;
         this.size = Objects.requireNonNull(size);
@@ -67,7 +67,7 @@ public class OneDriveThumbnail extends OneDriveResource {
         this(api, itemId, 0, size);
     }
 
-    public OneDriveThumbnail.Metadata getMetadata() throws OneDriveAPIException {
+    public Metadata getMetadata() throws OneDriveAPIException {
         URL url;
         if (isRoot()) {
             url = GET_THUMBNAIL_ROOT_URL.build(getApi().getBaseURL(), thumbId, size.getKey());
@@ -76,7 +76,7 @@ public class OneDriveThumbnail extends OneDriveResource {
         }
         OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "GET");
         OneDriveJsonResponse response = request.send();
-        return new OneDriveThumbnail.Metadata(response.getContent());
+        return new Metadata(response.getContent());
     }
 
     public InputStream download() throws OneDriveAPIException {

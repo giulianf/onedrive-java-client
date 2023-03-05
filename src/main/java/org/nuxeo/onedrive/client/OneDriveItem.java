@@ -1,22 +1,27 @@
 /*
  * (C) Copyright 2016 Nuxeo SA (http://nuxeo.com/) and others.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *  
+ *
  * Contributors:
  *     Kevin Leturc
  */
 package org.nuxeo.onedrive.client;
+
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
+import com.eclipsesource.json.ParseException;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -26,16 +31,16 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import com.eclipsesource.json.JsonArray;
-import com.eclipsesource.json.JsonObject;
-import com.eclipsesource.json.JsonValue;
-import com.eclipsesource.json.ParseException;
-
 /**
  * @since 1.0
  */
 public abstract class OneDriveItem extends OneDriveResource {
+    private static final URLTemplate PERMISSIONS_ITEM_URL = new URLTemplate("/drive/items/%s/permissions");
+    private static final URLTemplate PERMISSIONS_ROOT_ITEM_URL = new URLTemplate("/drive/root/permissions");
 
+    protected static final URLTemplate ITEMS_URL = new URLTemplate("/drive/items/%s");
+    private static final URLTemplate CREATE_SHARE_URL = new URLTemplate("/drive/items/%s/action.invite");
+    private static final URLTemplate CREATE_ROOT_SHARE_URL = new URLTemplate("/drive/root/action.invite");
     private static final URLTemplate CREATE_SHARED_LINK_URL = new URLTemplate("/drive/items/%s/action.createLink");
 
     private static final URLTemplate CREATE_SHARED_LINK_ROOT_URL = new URLTemplate("/drive/root/action.createLink");
@@ -45,10 +50,13 @@ public abstract class OneDriveItem extends OneDriveResource {
     }
 
     public OneDriveItem(OneDriveAPI api, String id) {
-        super(api, id);
+        super(api, id, null);
+    }
+    public OneDriveItem(OneDriveAPI api, String id, String path) {
+        super(api, id, path);
     }
 
-    public abstract OneDriveItem.Metadata getMetadata(OneDriveExpand... expand) throws OneDriveAPIException;
+    public abstract Metadata getMetadata(OneDriveExpand... expand) throws OneDriveAPIException;
 
     public OneDriveThumbnailSet.Metadata getThumbnailSet() throws OneDriveAPIException {
         try {
@@ -74,6 +82,35 @@ public abstract class OneDriveItem extends OneDriveResource {
         return () -> new OneDriveThumbnailSetIterator(getApi(), getId());
     }
 
+    public OneDrivePermission.Metadata createShare(List<String> sharedWith) throws OneDriveAPIException {
+        URL url;
+        if (isRoot()) {
+            url = CREATE_ROOT_SHARE_URL.build(getApi().getBaseURL());
+        } else {
+            url = CREATE_SHARE_URL.build(getApi().getBaseURL(), getId());
+        }
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "POST");
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.add("requireSignIn", false);
+        jsonObject.add("sendInvitation", true);
+        JsonArray jsonArray = new JsonArray();
+        jsonArray.add("read");
+
+        jsonObject.add("roles", jsonArray);
+        jsonArray = new JsonArray();
+        for (String with : sharedWith) {
+            JsonObject jsonEmailObject = new JsonObject();
+            jsonEmailObject.add("email", with);
+            jsonArray.add(jsonEmailObject);
+        }
+        jsonObject.add("recipients", jsonArray);
+
+        request.setBody(jsonObject);
+        OneDriveJsonResponse response = request.send();
+        OneDrivePermission oneDrivePermission = new OneDrivePermission(getApi());
+        return oneDrivePermission.new Metadata(response.getContent());
+    }
+
     public OneDrivePermission.Metadata createSharedLink(OneDriveSharingLink.Type type) throws OneDriveAPIException {
         URL url;
         if (isRoot()) {
@@ -82,6 +119,7 @@ public abstract class OneDriveItem extends OneDriveResource {
             url = CREATE_SHARED_LINK_URL.build(getApi().getBaseURL(), getId());
         }
         OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "POST");
+
         request.setBody(new JsonObject().add("type", type.getType()));
         OneDriveJsonResponse response = request.send();
         String permissionId = response.getContent().asObject().get("id").asString();
@@ -94,7 +132,27 @@ public abstract class OneDriveItem extends OneDriveResource {
         return permission.new Metadata(response.getContent());
     }
 
-    /** See documentation at https://dev.onedrive.com/resources/item.htm. */
+    public Iterable<OneDrivePermission.Metadata> getShareList() throws OneDriveAPIException {
+        URL url;
+        if (isRoot()) {
+            url = PERMISSIONS_ROOT_ITEM_URL.build(getApi().getBaseURL());
+        } else {
+            url = PERMISSIONS_ITEM_URL.build(getApi().getBaseURL(), getId());
+        }
+
+        return () -> new OneDrivePermissionIterator(getApi(), url);
+    }
+
+    public void deleteItem() throws OneDriveAPIException {
+        URL url = ITEMS_URL.build(getApi().getBaseURL(), getId());
+
+        OneDriveRequest request = new OneDriveRequest(getApi(), url, "DELETE");
+        request.send();
+    }
+
+    /**
+     * See documentation at https://dev.onedrive.com/resources/item.htm.
+     */
     public abstract class Metadata extends OneDriveResource.Metadata {
 
         private String name;

@@ -24,12 +24,13 @@ package org.nuxeo.onedrive.client;
 public class OneDriveBusinessAPI extends AbstractOneDriveAPI {
 
     private final String baseUrl;
+    private static final String BASE_URL = "https://graph.microsoft.com/v1.0";
 
     private final String emailUrl;
 
     public OneDriveBusinessAPI(String resourceURL, String accessToken) {
         super(accessToken);
-        this.baseUrl = resourceURL + "_api/v2.0";
+        this.baseUrl = BASE_URL;
         this.emailUrl = resourceURL + "_api/SP.UserProfiles.PeopleManager/GetMyProperties";
     }
 

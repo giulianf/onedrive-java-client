@@ -18,6 +18,7 @@
  */
 package org.nuxeo.onedrive.client;
 
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -36,6 +37,13 @@ public class OneDriveJsonRequest extends AbstractRequest<OneDriveJsonResponse> {
         super(api, url, method);
         if (!"GET".equals(method)) {
             addHeader("Content-Type", "application/json");
+        }
+        addHeader("accept", "application/json");
+    }
+    public OneDriveJsonRequest(OneDriveAPI api, URL url, String method, String contentType) {
+        super(api, url, method);
+        if (!"GET".equals(method)) {
+            addHeader("Content-Type", contentType);
         }
         addHeader("accept", "application/json");
     }

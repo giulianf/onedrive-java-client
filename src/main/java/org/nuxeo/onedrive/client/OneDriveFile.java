@@ -18,12 +18,12 @@
  */
 package org.nuxeo.onedrive.client;
 
-import java.io.InputStream;
-import java.net.URL;
-
 import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
 import com.eclipsesource.json.ParseException;
+
+import java.io.InputStream;
+import java.net.URL;
 
 /**
  * @since 1.0
@@ -33,18 +33,27 @@ public class OneDriveFile extends OneDriveItem {
     private static final URLTemplate GET_FILE_URL = new URLTemplate("/drive/items/%s");
 
     private static final URLTemplate GET_FILE_CONTENT_URL = new URLTemplate("/drive/items/%s/content");
+    private static final URLTemplate UPLOAD_ROOT_CONTENT_URL = new URLTemplate("/drive/root:%s:/content");
+    private static final URLTemplate UPLOAD_CONTENT_URL = new URLTemplate("/drive/items/%s/content");
+    private static final URLTemplate GET_BY_PATH_URL = new URLTemplate("/drive/root:/%s");
 
+    public OneDriveFile(OneDriveAPI api) {
+        super(api);
+    }
     public OneDriveFile(OneDriveAPI api, String id) {
         super(api, id);
     }
+    public OneDriveFile(OneDriveAPI api, String id, String path) {
+        super(api, id, path);
+    }
 
     @Override
-    public OneDriveFile.Metadata getMetadata(OneDriveExpand... expands) throws OneDriveAPIException {
+    public Metadata getMetadata(OneDriveExpand... expands) throws OneDriveAPIException {
         QueryStringBuilder query = new QueryStringBuilder().set("expand", expands);
         URL url = GET_FILE_URL.build(getApi().getBaseURL(), query, getId());
         OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "GET");
         OneDriveJsonResponse response = request.send();
-        return new OneDriveFile.Metadata(response.getContent());
+        return new Metadata(response.getContent());
     }
 
     public InputStream download() throws OneDriveAPIException {
@@ -52,6 +61,46 @@ public class OneDriveFile extends OneDriveItem {
         OneDriveRequest request = new OneDriveRequest(getApi(), url, "GET");
         OneDriveResponse response = request.send();
         return response.getContent();
+    }
+    public Metadata upload(boolean isRoot , long size, InputStream contentFromBytes) throws OneDriveAPIException {
+        URL url = isRoot ? UPLOAD_ROOT_CONTENT_URL.build(getApi().getBaseURL(), getId()) : UPLOAD_CONTENT_URL.build(getApi().getBaseURL(), getId());
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "PUT", "application/octet-stream");
+        request.addHeader("Content-Length", String.valueOf(size));
+
+        request.setBody(contentFromBytes);
+        OneDriveJsonResponse response = request.send();
+        return new Metadata(response.getContent());
+    }
+
+    public Metadata renameItem(String newName, String newParentFolderId) throws OneDriveAPIException {
+        URL url = ITEMS_URL.build(getApi().getBaseURL(), getId());
+
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "PATCH");
+        JsonObject jsonObject = new JsonObject();
+        JsonObject jsonParentObject = new JsonObject();
+        // move if not empty
+        if (newParentFolderId != null && !newParentFolderId.isEmpty()) {
+            jsonParentObject.add("id", newParentFolderId);
+            jsonObject.add("newParentFolderId", jsonParentObject);
+        }
+        jsonObject.add("name", newName);
+        request.setBody(jsonObject);
+        OneDriveJsonResponse response = request.send();
+
+        return new Metadata(response.getContent());
+    }
+    public Metadata getByPath() throws OneDriveAPIException {
+        URL url;
+
+        url = GET_BY_PATH_URL.build(getApi().getBaseURL(), getPath());
+        OneDriveJsonRequest request = new OneDriveJsonRequest(getApi(), url, "GET");
+        OneDriveJsonResponse response = request.send();
+
+        return new Metadata(response.getContent());
+    }
+
+    public URL getUrlRename(){
+        return ITEMS_URL.build(getApi().getBaseURL(), getId());
     }
 
     /** See documentation at https://dev.onedrive.com/resources/item.htm. */
@@ -68,6 +117,9 @@ public class OneDriveFile extends OneDriveItem {
 
         /** Not available for business. */
         private String sha1Hash;
+
+        /** custom value */
+        private String custom;
 
         public Metadata(JsonObject json) {
             super(json);
@@ -115,6 +167,8 @@ public class OneDriveFile extends OneDriveItem {
                     downloadUrl = value.asString();
                 } else if ("file".equals(memberName)) {
                     parseMember(value.asObject(), this::parseFileMember);
+                } else if ("id".equals(memberName) && getPath() != null) {
+                    custom = value.asString();
                 }
             } catch (ParseException e) {
                 throw new OneDriveRuntimeException("Parse failed, maybe a bug in client.", e);
@@ -152,10 +206,13 @@ public class OneDriveFile extends OneDriveItem {
         }
 
         @Override
-        public OneDriveFile.Metadata asFile() {
+        public Metadata asFile() {
             return this;
         }
 
+        public String getCustom() {
+            return custom;
+        }
     }
 
 }
